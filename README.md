@@ -1,1 +1,199 @@
 # Shooting-game-mini-proj
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advanced Shooter Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        canvas { display: block; margin: 0 auto; background: #000 url('https://i.imgur.com/0NnJz4w.png') repeat; }
+        #ui {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+<div id="ui">
+    <div>Score: <span id="score">0</span> | High Score: <span id="highScore">0</span></div>
+    <div>Level: <span id="level">1</span></div>
+</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<audio id="bgMusic" src="https://www.soundjay.com/game-sounds/space-shooter.mp3" loop></audio>
+<audio id="shootSound" src="https://www.soundjay.com/button/sounds/button-21.mp3"></audio>
+<audio id="explosion" src="https://www.soundjay.com/explosion/sounds/explosion-05.mp3"></audio>
+<audio id="powerUp" src="https://www.soundjay.com/button/sounds/button-11.mp3"></audio>
+
+<script>
+// Game variables
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreDisplay = document.getElementById('score');
+const highScoreDisplay = document.getElementById('highScore');
+const levelDisplay = document.getElementById('level');
+
+// Load sounds
+const bgMusic = document.getElementById('bgMusic');
+bgMusic.volume = 0.2;
+bgMusic.play().catch(() => {}); // Autoplay may fail in some browsers
+
+// Player setup
+const player = {
+    x: canvas.width/2,
+    y: canvas.height - 80,
+    width: 60,
+    height: 60,
+    color: '#00ff00',
+    speed: 5,
+    bullets: [],
+    powerUps: {
+        speedBoost: false,
+        doubleShot: false
+    }
+};
+
+// Game state
+let enemies = [];
+let powerUps = [];
+let score = 0;
+let highScore = localStorage.getItem('highScore') || 0;
+let level = 1;
+let gameOver = false;
+let lastEnemySpawn = 0;
+let enemySpawnInterval = 1500; // ms
+let powerUpSpawnChance = 0.1;
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') shootBullet();
+});
+
+// Game loop
+function gameLoop(timestamp) {
+    update(timestamp);
+    draw();
+    if (!gameOver) requestAnimationFrame(gameLoop);
+}
+
+// Player movement and shooting
+function update(timestamp) {
+    // Enemy spawning with level scaling
+    if (timestamp - lastEnemySpawn > enemySpawnInterval) {
+        spawnEnemy();
+        lastEnemySpawn = timestamp;
+    }
+
+    // Update bullets
+    player.bullets.forEach((bullet, index) => {
+        bullet.y -= bullet.speed;
+        if (bullet.y < 0) player.bullets.splice(index, 1);
+    });
+
+    // Update enemies with different patterns
+    enemies.forEach((enemy, eIndex) => {
+        enemy.update();
+        
+        // Check bullet collisions
+        player.bullets.forEach((bullet, bIndex) => {
+            if (collision(bullet, enemy)) {
+                enemies.splice(eIndex, 1);
+                player.bullets.splice(bIndex, 1);
+                score += 10;
+                checkPowerUpSpawn(enemy.x, enemy.y);
+                document.getElementById('explosion').play();
+            }
+        });
+        
+        // Check player collision
+        if (collision(player, enemy)) {
+            gameOver = true;
+            document.getElementById('explosion').play();
+            updateHighScore();
+            alert(`Game Over! Your score: ${score}`);
+        }
+    });
+    
+    // Update power-ups
+    powerUps.forEach((pu, index) => {
+        pu.y += 2;
+        if (collision(player, pu)) {
+            applyPowerUp(pu.type);
+            powerUps.splice(index, 1);
+            document.getElementById('powerUp').play();
+        } else if (pu.y > canvas.height) {
+            powerUps.splice(index, 1);
+        }
+    });
+    
+    // Level progression
+    if (score > level * 1000) {
+        level++;
+        updateDifficulty();
+    }
+}
+
+// Collision detection
+function collision(a, b) {
+    return !(
+        a.x > b.x + b.width ||
+        a.x + a.width < b.x ||
+        a.y > b.y + b.height ||
+        a.y + a.height < b.y
+    );
+}
+
+// Shooting function with power-up effects
+function shootBullet() {
+    document.getElementById('shootSound').play();
+    
+    // Double shot power-up
+    if (player.powerUps.doubleShot) {
+        player.bullets.push({
+            x: player.x + 10,
+            y: player.y,
+            width: 5,
+            height: 15,
+            speed: 8,
+            color: '#fff'
+        });
+        player.bullets.push({
+            x: player.x + 45,
+            y: player.y,
+            width: 5,
+            height: 15,
+            speed: 8,
+            color: '#fff'
+        });
+    } else {
+        player.bullets.push({
+            x: player.x + 25,
+            y: player.y,
+            width: 10,
+            height: 20,
+            speed: 7,
+            color: '#fff'
+        });
+    }
+}
+
+// Power-up spawning
+function checkPowerUpSpawn(x, y) {
+    if (Math.random() < powerUpSpawnChance) {
+        powerUps.push({
+            x: x,
+            y: y,
+            width: 20,
+            height: 20,
+            type: Math.random() > 0.5 ? 'speed' : 'double'
+        });
+    }
+}
+
+// Apply power-up effects
+function applyPowerUp(type) {
+    if (type === 'speed') {
+        player.power
